@@ -1,5 +1,5 @@
 [package]
-name = "simper-svf"
+name = "simper-filter"
 version = "0.1.0"
 edition = "2021"
 
