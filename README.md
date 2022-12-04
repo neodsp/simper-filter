@@ -1,6 +1,6 @@
 # simper-svf
 
-State Variable Filters for real-time audio code in pure Rust.
+State Variable Filters for real-time audio in pure Rust.
 Based on the [filter design by Andrew Simper (Cytomic)](https://cytomic.com/files/dsp/SvfLinearTrapOptimised2.pdf).
 
 ## Example
