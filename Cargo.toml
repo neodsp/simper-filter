@@ -2,6 +2,13 @@
 name = "simper-filter"
 version = "0.1.0"
 edition = "2021"
+authors = ["Stephan Eckes <stephan@neodsp.com>"]
+description = "State Variable Filters for real-time audio in pure Rust"
+readme = "README.md"
+homepage = "https://neodsp.com/"
+repository = "https://github.com/neodsp/simper-filter/"
+license = "MIT OR Apache-2.0"
+keywords = ["audio", "dsp", "filter"]
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
