@@ -17,6 +17,7 @@ pub enum SvfError {
     Fatal,
 }
 
+/// All available filter types for the State Variable Filter
 #[derive(Default, Clone, PartialEq, Eq)]
 pub enum FilterType {
     #[default]
@@ -31,6 +32,8 @@ pub enum FilterType {
     Highshelf,
 }
 
+/// A State Variable Filter that is copied from Andrew Simper (Cytomic)
+/// https://cytomic.com/files/dsp/SvfLinearTrapOptimised2.pdf
 #[derive(Default)]
 pub struct Svf<F: Float> {
     coefficients: SvfCoefficients<F>,
@@ -38,6 +41,7 @@ pub struct Svf<F: Float> {
     ic2eq: F,
 }
 
+/// The filter coefficients that hold old necessary data to reproduce the filter
 #[derive(Default, Clone, PartialEq, Eq)]
 pub struct SvfCoefficients<F: Float> {
     filter_type: FilterType,
@@ -54,6 +58,14 @@ pub struct SvfCoefficients<F: Float> {
 }
 
 impl<F: Float + Default> Svf<F> {
+    /// sets the filter to an inital response
+    /// use `Svf::default` otherwise
+    /// Parameters:
+    /// - filter_type: choose one of the filter types, like peak, lowpass or highpass
+    /// - sample_rate: the sample_rate of the audio buffer that the filter should be applied on
+    /// - frequency: the frequency in Hz where the cutoff of the filter should be
+    /// - q: the steepness of the filter
+    /// - gain: the gain boost or decrease of the filter
     pub fn new(
         filter_type: FilterType,
         sample_rate: F,
@@ -66,6 +78,7 @@ impl<F: Float + Default> Svf<F> {
         Ok(svf)
     }
 
+    /// process helper function that calls `Svf::tick` on each sample
     #[inline]
     pub fn process(&mut self, input: &[F], output: &mut [F]) {
         output
@@ -76,16 +89,22 @@ impl<F: Float + Default> Svf<F> {
             });
     }
 
-    /// Reset state of filter
-    /// Can be used when the audio callback is restarted
+    /// Reset state of filter.
+    /// Can be used when the audio callback is restarted.
     #[inline]
     pub fn reset(&mut self) {
         self.ic1eq = F::zero();
         self.ic2eq = F::zero();
     }
 
-    /// Set new filter parameters
-    /// Can be updated in the audio callback
+    /// The set function is setting the current parameters of the filter.
+    /// Don't call from a different thread than tick.
+    /// Parameters:
+    /// - filter_type: choose one of the filter types, like peak, lowpass or highpass
+    /// - sample_rate: the sample_rate of the audio buffer that the filter should be applied on
+    /// - frequency: the frequency in Hz where the cutoff of the filter should be
+    /// - q: the steepness of the filter
+    /// - gain: the gain boost or decrease of the filter
     #[inline]
     pub fn set(
         &mut self,
@@ -99,7 +118,7 @@ impl<F: Float + Default> Svf<F> {
             .set(filter_type, sample_rate, cutoff, q, gain)
     }
 
-    /// Set new filter with coefficients struct
+    /// Set new filter parameters from coefficients struct
     pub fn set_coeffs(&mut self, coefficients: SvfCoefficients<F>) {
         self.coefficients = coefficients;
     }
@@ -132,22 +151,32 @@ impl<F: Float + Default> Svf<F> {
     }
 }
 
-/// The SvfCoefficients hold all data to construct the current filter and filter response
 impl<F: Float> SvfCoefficients<F> {
+    /// The set function is setting the current parameters of the filter.
+    /// Don't call from a different thread than tick.
+    /// Parameters:
+    /// - filter_type: choose one of the filter types, like peak, lowpass or highpass
+    /// - sample_rate: the sample_rate of the audio buffer that the filter should be applied on
+    /// - frequency: the frequency in Hz where the cutoff of the filter should be
+    /// - q: the steepness of the filter
+    /// - gain: the gain boost or decrease of the filter
     pub fn set(
         &mut self,
         filter_type: FilterType,
         sample_rate: F,
-        cutoff: F,
+        cutoff_frequency: F,
         q: F,
         gain: F,
     ) -> Result<(), SvfError> {
         if q < F::zero() {
             return Err(SvfError::NegativeQ);
         }
+        if cutoff_frequency > sample_rate / F::from(2.0).unwrap() {
+            return Err(SvfError::FrequencyOverNyqist);
+        }
         self.filter_type = filter_type;
         self.sample_rate = sample_rate;
-        self.cutoff = cutoff;
+        self.cutoff = cutoff_frequency;
         self.q = q;
         self.gain = gain;
 
