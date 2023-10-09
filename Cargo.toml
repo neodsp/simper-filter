@@ -6,6 +6,6 @@ edition = "2021"
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
-num-traits = "0.2.15"
-num-complex = "0.4.2"
-thiserror = "1.0.37"
+num-traits = "0.2"
+num-complex = "0.4"
+thiserror = "1.0"
