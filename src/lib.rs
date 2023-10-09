@@ -505,8 +505,8 @@ mod tests {
             .set(FilterType::Lowpass, 44100.0, 400.0, f32::sqrt(2.0), 0.0)
             .unwrap();
         let _response = filter.get_response(20.0).unwrap();
-        let input = vec![0.; 100];
-        let mut output = vec![0.; 100];
+        let input = vec![0.0; 100];
+        let mut output = vec![0.0; 100];
         filter.process(&input, &mut output);
     }
 }

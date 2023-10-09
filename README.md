@@ -15,11 +15,11 @@ let mut filter = Svf::new(FilterType::Lowpass, 44100.0, 400.0, 0.771, 0.0);
 filter.set(FilterType::Lowpass, 44100.0, 400.0, 0.771, 0.0);
 
 // get response for specific frequency as complex number
-let response = filter.get_response(400.);
+let response = filter.get_response(400.0);
 
 // process a whole buffer
-let input = vec![0.; 100];
-let mut output = vec![0.; 100];
+let input = vec![0.0; 100];
+let mut output = vec![0.0; 100];
 filter.process(&input, &mut output);
 
 // or process on sample basis
