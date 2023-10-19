@@ -7,6 +7,7 @@ description = "State Variable Filters for real-time audio in pure Rust"
 readme = "README.md"
 homepage = "https://neodsp.com/"
 repository = "https://github.com/neodsp/simper-filter/"
+categories = ["multimedia::audio"]
 license = "MIT OR Apache-2.0"
 keywords = ["svf", "audio", "dsp", "filter"]
 
