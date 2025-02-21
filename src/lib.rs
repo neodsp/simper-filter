@@ -1,6 +1,8 @@
+#![cfg_attr(not(test), no_std)]
+
+use core::f64::consts::{PI, TAU};
 use num_complex::Complex64;
 use num_traits::Float;
-use std::f64::consts::{PI, TAU};
 use thiserror::Error;
 
 #[derive(Error, Debug)]
