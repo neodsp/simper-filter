@@ -16,4 +16,4 @@ keywords = ["svf", "audio", "dsp", "filter"]
 [dependencies]
 num-traits = "0.2"
 num-complex = "0.4"
-thiserror = "1.0"
+thiserror = "2.0"
