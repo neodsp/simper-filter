@@ -224,7 +224,6 @@ impl<F: Float> SvfCoefficients<F> {
                 self.a2 = g * self.a1;
                 self.a3 = g * self.a2;
                 self.m0 = F::one();
-                self.m0 = F::one();
                 self.m1 = -k;
                 self.m2 = F::zero();
             }
