@@ -1,6 +1,6 @@
 [package]
 name = "simper-filter"
-version = "0.1.0"
+version = "0.1.1"
 edition = "2021"
 authors = ["Stephan Eckes <stephan@neodsp.com>"]
 description = "State Variable Filters for real-time audio in pure Rust"
