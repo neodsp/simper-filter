@@ -251,7 +251,10 @@ impl<F: Float> SvfCoefficients<F> {
                 self.m2 = F::zero();
             }
             FilterType::Bell => {
-                let a = F::sqrt(self.gain);
+                let a = F::powf(
+                    F::from(10).ok_or(SvfError::Fatal)?,
+                    self.gain / F::from(40).unwrap(),
+                );
                 let g =
                     F::tan(F::from(PI).ok_or(SvfError::Fatal)? * self.cutoff / self.sample_rate);
                 let k = F::one() / (self.q * a);
@@ -263,7 +266,10 @@ impl<F: Float> SvfCoefficients<F> {
                 self.m2 = F::zero();
             }
             FilterType::Lowshelf => {
-                let a = F::sqrt(self.gain);
+                let a = F::powf(
+                    F::from(10).ok_or(SvfError::Fatal)?,
+                    self.gain / F::from(40).unwrap(),
+                );
                 let g =
                     F::tan(F::from(PI).ok_or(SvfError::Fatal)? * self.cutoff / self.sample_rate)
                         / F::sqrt(a);
@@ -276,7 +282,10 @@ impl<F: Float> SvfCoefficients<F> {
                 self.m2 = a * a - F::one();
             }
             FilterType::Highshelf => {
-                let a = F::sqrt(self.gain);
+                let a = F::powf(
+                    F::from(10).ok_or(SvfError::Fatal)?,
+                    self.gain / F::from(40).unwrap(),
+                );
                 let g =
                     F::tan(F::from(PI).ok_or(SvfError::Fatal)? * self.cutoff / self.sample_rate)
                         * F::sqrt(a);
