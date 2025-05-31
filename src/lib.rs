@@ -237,7 +237,7 @@ impl<F: Float> SvfCoefficients<F> {
                 self.a3 = g * self.a2;
                 self.m0 = F::one();
                 self.m1 = -k;
-                self.m2 = F::from(-2.).ok_or(SvfError::Fatal)?;
+                self.m2 = F::from(-2).ok_or(SvfError::Fatal)?;
             }
             FilterType::Allpass => {
                 let g =
@@ -247,11 +247,14 @@ impl<F: Float> SvfCoefficients<F> {
                 self.a2 = g * self.a1;
                 self.a3 = g * self.a2;
                 self.m0 = F::one();
-                self.m1 = F::from(-2.).ok_or(SvfError::Fatal)? * k;
+                self.m1 = F::from(-2).ok_or(SvfError::Fatal)? * k;
                 self.m2 = F::zero();
             }
             FilterType::Bell => {
-                let a = F::sqrt(self.gain);
+                let a = F::powf(
+                    F::from(10).ok_or(SvfError::Fatal)?,
+                    self.gain / F::from(40).unwrap(),
+                );
                 let g =
                     F::tan(F::from(PI).ok_or(SvfError::Fatal)? * self.cutoff / self.sample_rate);
                 let k = F::one() / (self.q * a);
@@ -263,7 +266,10 @@ impl<F: Float> SvfCoefficients<F> {
                 self.m2 = F::zero();
             }
             FilterType::Lowshelf => {
-                let a = F::sqrt(self.gain);
+                let a = F::powf(
+                    F::from(10).ok_or(SvfError::Fatal)?,
+                    self.gain / F::from(40).unwrap(),
+                );
                 let g =
                     F::tan(F::from(PI).ok_or(SvfError::Fatal)? * self.cutoff / self.sample_rate)
                         / F::sqrt(a);
@@ -276,7 +282,10 @@ impl<F: Float> SvfCoefficients<F> {
                 self.m2 = a * a - F::one();
             }
             FilterType::Highshelf => {
-                let a = F::sqrt(self.gain);
+                let a = F::powf(
+                    F::from(10).ok_or(SvfError::Fatal)?,
+                    self.gain / F::from(40).unwrap(),
+                );
                 let g =
                     F::tan(F::from(PI).ok_or(SvfError::Fatal)? * self.cutoff / self.sample_rate)
                         * F::sqrt(a);
@@ -500,15 +509,389 @@ impl SvfResponse {
 mod tests {
     use super::*;
 
+    fn generate_sine<F: Float>(sample_rate: f64, frequency: f64, num_samples: usize) -> Vec<F> {
+        (0..num_samples)
+            .map(|i| F::from((2.0 * PI * frequency * i as f64 / sample_rate).sin()).unwrap())
+            .collect()
+    }
+
+    fn rms_db<F: Float>(data: &[F]) -> F {
+        let sum_of_squares = data.iter().fold(F::zero(), |acc, &x| acc + x * x);
+        let mean_of_squares = sum_of_squares / F::from(data.len()).unwrap();
+        let rms = mean_of_squares.sqrt();
+        let twenty = F::from(20.0).unwrap();
+        twenty * rms.log10()
+    }
+
+    struct Point {
+        freq: f64,
+        expected_gain_db: f64,
+    }
+
+    fn test_fiter(mut filter: Svf<f64>, points: &[Point]) {
+        let sample_rate = filter.coefficients.sample_rate;
+        let num_samples = sample_rate as usize;
+        let mut output = vec![0.0; num_samples];
+
+        for point in points {
+            let sine = generate_sine::<f64>(sample_rate, point.freq, num_samples);
+            filter.reset();
+            filter.process(&sine, &mut output);
+            assert_eq!(rms_db(&output).round(), point.expected_gain_db);
+        }
+    }
+
     #[test]
-    fn it_works() {
-        let mut filter = Svf::<f32>::default();
-        filter
-            .set(FilterType::Lowpass, 44100.0, 400.0, f32::sqrt(2.0), 0.0)
-            .unwrap();
-        let _response = filter.get_response(20.0).unwrap();
-        let input = vec![0.0; 100];
-        let mut output = vec![0.0; 100];
-        filter.process(&input, &mut output);
+    fn test_lowpass() {
+        test_fiter(
+            Svf::new(FilterType::Lowpass, 44100.0, 1000.0, 0.71, 0.0).unwrap(),
+            &[
+                Point {
+                    freq: 20.0,
+                    expected_gain_db: -3.0,
+                },
+                Point {
+                    freq: 500.0,
+                    expected_gain_db: -3.0,
+                },
+                Point {
+                    freq: 1000.0,
+                    expected_gain_db: -6.0,
+                },
+                Point {
+                    freq: 5000.0,
+                    expected_gain_db: -32.0,
+                },
+                Point {
+                    freq: 10000.0,
+                    expected_gain_db: -46.0,
+                },
+                Point {
+                    freq: 20000.0,
+                    expected_gain_db: -79.0,
+                },
+            ],
+        );
+    }
+
+    #[test]
+    fn test_highpass() {
+        test_fiter(
+            Svf::new(FilterType::Highpass, 44100.0, 1000.0, 0.71, 0.0).unwrap(),
+            &[
+                Point {
+                    freq: 20.0,
+                    expected_gain_db: -70.0,
+                },
+                Point {
+                    freq: 500.0,
+                    expected_gain_db: -15.0,
+                },
+                Point {
+                    freq: 1000.0,
+                    expected_gain_db: -6.0,
+                },
+                Point {
+                    freq: 5000.0,
+                    expected_gain_db: -3.0,
+                },
+                Point {
+                    freq: 10000.0,
+                    expected_gain_db: -3.0,
+                },
+                Point {
+                    freq: 20000.0,
+                    expected_gain_db: -3.0,
+                },
+            ],
+        );
+    }
+
+    #[test]
+    fn test_bandpass() {
+        test_fiter(
+            Svf::new(FilterType::Bandpass, 44100.0, 1000.0, 0.71, 0.0).unwrap(),
+            &[
+                Point {
+                    freq: 20.0,
+                    expected_gain_db: -37.0,
+                },
+                Point {
+                    freq: 500.0,
+                    expected_gain_db: -9.0,
+                },
+                Point {
+                    freq: 1000.0,
+                    expected_gain_db: -6.0,
+                },
+                Point {
+                    freq: 5000.0,
+                    expected_gain_db: -17.0,
+                },
+                Point {
+                    freq: 10000.0,
+                    expected_gain_db: -25.0,
+                },
+                Point {
+                    freq: 20000.0,
+                    expected_gain_db: -43.0,
+                },
+            ],
+        );
+    }
+
+    #[test]
+    fn test_notch() {
+        test_fiter(
+            Svf::new(FilterType::Notch, 44100.0, 1000.0, 0.71, 0.0).unwrap(),
+            &[
+                Point {
+                    freq: 20.0,
+                    expected_gain_db: -3.0,
+                },
+                Point {
+                    freq: 500.0,
+                    expected_gain_db: -6.0,
+                },
+                Point {
+                    freq: 1000.0,
+                    expected_gain_db: -42.0,
+                },
+                Point {
+                    freq: 5000.0,
+                    expected_gain_db: -3.0,
+                },
+                Point {
+                    freq: 10000.0,
+                    expected_gain_db: -3.0,
+                },
+                Point {
+                    freq: 20000.0,
+                    expected_gain_db: -3.0,
+                },
+            ],
+        );
+    }
+
+    #[test]
+    fn test_peak() {
+        test_fiter(
+            Svf::new(FilterType::Peak, 44100.0, 1000.0, 0.71, 0.0).unwrap(),
+            &[
+                Point {
+                    freq: 20.0,
+                    expected_gain_db: -3.0,
+                },
+                Point {
+                    freq: 500.0,
+                    expected_gain_db: -1.0,
+                },
+                Point {
+                    freq: 1000.0,
+                    expected_gain_db: 0.0,
+                },
+                Point {
+                    freq: 5000.0,
+                    expected_gain_db: -3.0,
+                },
+                Point {
+                    freq: 10000.0,
+                    expected_gain_db: -3.0,
+                },
+                Point {
+                    freq: 20000.0,
+                    expected_gain_db: -3.0,
+                },
+            ],
+        );
+    }
+
+    #[test]
+    fn test_bell() {
+        test_fiter(
+            Svf::new(FilterType::Bell, 44100.0, 1000.0, 0.71, 3.0).unwrap(),
+            &[
+                Point {
+                    freq: 20.0,
+                    expected_gain_db: -3.0,
+                },
+                Point {
+                    freq: 500.0,
+                    expected_gain_db: -2.0,
+                },
+                Point {
+                    freq: 1000.0,
+                    expected_gain_db: 0.0,
+                },
+                Point {
+                    freq: 5000.0,
+                    expected_gain_db: -3.0,
+                },
+                Point {
+                    freq: 10000.0,
+                    expected_gain_db: -3.0,
+                },
+                Point {
+                    freq: 20000.0,
+                    expected_gain_db: -3.0,
+                },
+            ],
+        );
+
+        test_fiter(
+            Svf::new(FilterType::Bell, 44100.0, 1000.0, 0.71, -3.0).unwrap(),
+            &[
+                Point {
+                    freq: 20.0,
+                    expected_gain_db: -3.0,
+                },
+                Point {
+                    freq: 500.0,
+                    expected_gain_db: -4.0,
+                },
+                Point {
+                    freq: 1000.0,
+                    expected_gain_db: -6.0,
+                },
+                Point {
+                    freq: 5000.0,
+                    expected_gain_db: -3.0,
+                },
+                Point {
+                    freq: 10000.0,
+                    expected_gain_db: -3.0,
+                },
+                Point {
+                    freq: 20000.0,
+                    expected_gain_db: -3.0,
+                },
+            ],
+        );
+    }
+
+    #[test]
+    fn test_lowshelf() {
+        test_fiter(
+            Svf::new(FilterType::Lowshelf, 44100.0, 1000.0, 0.71, -6.0).unwrap(),
+            &[
+                Point {
+                    freq: 20.0,
+                    expected_gain_db: -9.0,
+                },
+                Point {
+                    freq: 500.0,
+                    expected_gain_db: -9.0,
+                },
+                Point {
+                    freq: 1000.0,
+                    expected_gain_db: -6.0,
+                },
+                Point {
+                    freq: 5000.0,
+                    expected_gain_db: -3.0,
+                },
+                Point {
+                    freq: 10000.0,
+                    expected_gain_db: -3.0,
+                },
+                Point {
+                    freq: 20000.0,
+                    expected_gain_db: -3.0,
+                },
+            ],
+        );
+
+        test_fiter(
+            Svf::new(FilterType::Lowshelf, 44100.0, 1000.0, 0.71, 6.0).unwrap(),
+            &[
+                Point {
+                    freq: 20.0,
+                    expected_gain_db: 3.0,
+                },
+                Point {
+                    freq: 500.0,
+                    expected_gain_db: 3.0,
+                },
+                Point {
+                    freq: 1000.0,
+                    expected_gain_db: 0.0,
+                },
+                Point {
+                    freq: 5000.0,
+                    expected_gain_db: -3.0,
+                },
+                Point {
+                    freq: 10000.0,
+                    expected_gain_db: -3.0,
+                },
+                Point {
+                    freq: 20000.0,
+                    expected_gain_db: -3.0,
+                },
+            ],
+        );
+    }
+
+    #[test]
+    fn test_highshelf() {
+        test_fiter(
+            Svf::new(FilterType::Highshelf, 44100.0, 1000.0, 0.71, -6.0).unwrap(),
+            &[
+                Point {
+                    freq: 20.0,
+                    expected_gain_db: -3.0,
+                },
+                Point {
+                    freq: 500.0,
+                    expected_gain_db: -3.0,
+                },
+                Point {
+                    freq: 1000.0,
+                    expected_gain_db: -6.0,
+                },
+                Point {
+                    freq: 5000.0,
+                    expected_gain_db: -9.0,
+                },
+                Point {
+                    freq: 10000.0,
+                    expected_gain_db: -9.0,
+                },
+                Point {
+                    freq: 20000.0,
+                    expected_gain_db: -9.0,
+                },
+            ],
+        );
+
+        test_fiter(
+            Svf::new(FilterType::Highshelf, 44100.0, 1000.0, 0.71, 6.0).unwrap(),
+            &[
+                Point {
+                    freq: 20.0,
+                    expected_gain_db: -3.0,
+                },
+                Point {
+                    freq: 500.0,
+                    expected_gain_db: -3.0,
+                },
+                Point {
+                    freq: 1000.0,
+                    expected_gain_db: 0.0,
+                },
+                Point {
+                    freq: 5000.0,
+                    expected_gain_db: 3.0,
+                },
+                Point {
+                    freq: 10000.0,
+                    expected_gain_db: 3.0,
+                },
+                Point {
+                    freq: 20000.0,
+                    expected_gain_db: 3.0,
+                },
+            ],
+        );
     }
 }
